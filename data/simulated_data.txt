@@ -1,4 +1,4 @@
 StringID     Type         x            y            demand       ReadyTime    DueDate
-L1                        0	           0	          10	         0             1
-L2	                      5	           2	          -5	         0             2
-L3	                      1	           3	          0	           0             3
+L1           t            0            0            10           0             1
+L2           t            5            2            -5           0             2
+L3           t            1            3            0            0             3
