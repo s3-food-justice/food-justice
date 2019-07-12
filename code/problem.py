@@ -18,6 +18,11 @@ class City:
     def __hash__(self) -> int:
         return hash(self.name)
 
+    def __repr__(self):
+        return 'City(name={}, x={}, y={}, balance={}, time={})'.format(
+            self.name, self.x, self.y, self.balance, self.time
+        )
+
 
 class Solution:
     def __init__(self, solution: Dict[Tuple[City, City], float]):
@@ -31,24 +36,27 @@ class Solution:
         return self.solution[key]
 
 
-class Problem:
-    @dataclass(order=True)
-    class Package:
-        amount: int = field(compare=False)
-        destination: int = field(compare=False)
-        distance: float = field(compare=True)
-        expiration: float = field(compare=True)
+@dataclass(order=True)
+class Package:
+    amount: int = field(compare=False)
+    source: int = field(compare=False)
+    destination: int = field(compare=False)
+    distance: float = field(compare=True)
+    expiration: float = field(compare=True)
 
-    @dataclass(order=True)
-    class Balance:
-        amount: float = field(compare=False)
-        expiration: float = field(compare=True)
 
+@dataclass(order=True)
+class Balance:
+    amount: float = field(compare=False)
+    expiration: float = field(compare=True)
+
+
+class FoodDistribution:
     def __init__(self, cities: List[City]):
         self.cities = cities
         self.distances = [[dist(c1, c2) for c2 in self.cities]
                           for c1 in self.cities]
-        self.speed = 10
+        self.speed = 2
 
     def get_city(self, name: str) -> Optional[City]:
         for c in self.cities:
@@ -57,21 +65,24 @@ class Problem:
         return None
 
     def simulate(self, solution: Solution):
+        print('sim...', end='')
         ratios = self.compute_ratios(solution)
         excesses = []
         demands = []
         for c in self.cities:
             if c.balance > 0:
-                excesses.append([__class__.Balance(c.balance, c.time)])
+                excesses.append([Balance(c.balance, c.time)])
                 demands.append(0)
             else:
                 excesses.append([])
                 demands.append(-c.balance)
         total_demand = sum(demands)
+        total_cost = 0
         packages = []
         self.dispatch(packages, ratios, excesses)
         while True:
-            arrived = self.move(packages)
+            arrived, cost = self.move(packages)
+            total_cost += cost
             if arrived is None:
                 break
             dest = arrived.destination
@@ -79,15 +90,15 @@ class Problem:
                 demands[dest] -= arrived.amount
                 total_demand -= arrived.amount
             else:
-                heappush(excesses[dest],
-                         __class__.Balance(arrived.amount - demands[dest],
-                                           arrived.expiration))
+                heappush(excesses[dest], Balance(arrived.amount - demands[dest],
+                                                 arrived.expiration))
                 total_demand -= demands[dest]
                 demands[arrived.destination] = 0
             if total_demand <= 0:
                 break
             self.dispatch(packages, ratios, excesses)
-        pass
+        print('end')
+        return total_demand, total_cost
 
     def compute_ratios(self, solution):
         ratios = []
@@ -106,7 +117,7 @@ class Problem:
             ratios.append(r)
         return ratios
 
-    def dispatch(self, packages, ratios, balances) -> List[Package]:
+    def dispatch(self, packages, ratios, balances):
         for i1, c1 in enumerate(self.cities):
             if not balances[i1]:
                 continue
@@ -118,41 +129,43 @@ class Problem:
                     if r == 0:
                         continue
                     amount = balance.amount * r
-                    if amount < left:
+                    if left - amount > 1e-6:
                         left -= amount
                     else:
                         amount = left
                         left = 0
-                    package = __class__.Package(amount, i2,
-                                                self.distances[i1][i2],
-                                                balance.expiration)
+                    package = Package(amount, i1, i2,
+                                      self.distances[i1][i2],
+                                      balance.expiration)
                     heappush(packages, package)
                 if left > 0:
                     balance.amount = left
                     heappush(balances[i1], balance)
-        return packages
 
-    def move(self, packages) -> Optional[Package]:
+    def move(self, packages: List[Package]) -> Tuple[Optional[Package], float]:
         if not packages:
-            return None
+            return None, 0
+        cost = 0
         d = packages[0].distance
         for p in packages:
             p.distance -= d
             p.expiration -= d / self.speed
+            cost += d * p.amount
         head = heappop(packages)
         if head.expiration < 0:
             head = None
         else:
-            return head
+            return head, cost
         while packages:
             d = packages[0].distance
             for p in packages:
                 p.distance -= d
                 p.expiration -= d / self.speed
+                cost += d * p.amount
             head = heappop(packages)
             if head.expiration < 0:
                 head = None
-        return head
+        return head, cost
 
 
 def dist(c1: City, c2: City) -> float:

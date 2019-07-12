@@ -1,9 +1,9 @@
 from typing import List, Tuple, Dict
 
-from problem import Problem, City, Solution
+from problem import FoodDistribution, City, Solution
 
 
-def load_problem(filename: str) -> Problem:
+def load_problem(filename: str) -> FoodDistribution:
     with open(filename, 'r') as f:
         lines = f.readlines()
         header = lines[0].split()
@@ -13,15 +13,22 @@ def load_problem(filename: str) -> Problem:
                 break
             lines_cities.append(l)
         cities = load_cities(header, lines_cities)
-        return Problem(cities)
+        return FoodDistribution(cities)
 
 
+# noinspection PyUnboundLocalVariable
 def load_cities(h, lines_cities) -> List[City]:
-    cities = []
+    cities = dict()
+    n = 0
     for l in lines_cities:
+        skip = False
         for i, item in enumerate(l.split()):
             if h[i] == 'StringID':
                 name = item
+            elif h[i] == 'Type':
+                if item in ['d', 'f']:
+                    skip = True
+                    break
             elif h[i] == 'x':
                 x = float(item)
             elif h[i] == 'y':
@@ -32,12 +39,16 @@ def load_cities(h, lines_cities) -> List[City]:
                 tmin = int(float(item))
             elif h[i] == 'DueDate':
                 tmax = int(float(item))
-        # noinspection PyUnboundLocalVariable
-        cities.append(City(name, x, y, balance, tmax - tmin))
-    return cities
+        if not skip:
+            if (x, y) in cities:
+                cities[(x, y)][1].balance += balance
+            else:
+                cities[(x, y)] = (n, City(name, x, y, balance, tmax - tmin))
+            n += 1
+    return [c for _, c in sorted(cities.values(), key=lambda ic: ic[0])]
 
 
-def load_solution(filename: str, problem: Problem) -> Solution:
+def load_solution(filename: str, problem: FoodDistribution) -> Solution:
     with open(filename, 'r') as f:
         lines = f.readlines()
         header = lines[0].split()
