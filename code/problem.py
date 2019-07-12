@@ -4,6 +4,7 @@ from math import sqrt
 from typing import List, Dict, Tuple, Optional
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.collections import LineCollection
 
 
 class City:
@@ -49,13 +50,32 @@ class Solution:
         return self.solution[key]
 
     def plot(self, ax: plt.Axes, fd):
-        for c1 in fd.cities:
-            for c2 in fd.cities:
+        for i1, c1 in enumerate(fd.cities):
+            for i2, c2 in enumerate(fd.cities):
                 if c1 is c2:
                     continue
-                ax.plot([c1.x, c2.x], [c1.y, c2.y], '-k',
-                        lw=self.get_amount(c1, c2) * 10,
-                        zorder=0)
+                p1 = np.array([c1.x, c1.y])
+                p2 = np.array([c2.x, c2.y])
+                norm = p2 - p1
+                norm[0], norm[1] = -norm[1], norm[0]
+                norm /= np.linalg.norm(norm)
+                p1 += norm * 1
+                p2 += norm * 1
+                npts = 100
+                x = np.linspace(p1[0], p2[0], npts)
+                y = np.linspace(p1[1], p2[1], npts)
+                g = np.linspace(0, 1, npts)
+                points = np.array([x, y]).T.reshape(-1, 1, 2)
+                segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                nc = plt.Normalize(g.min(), g.max())
+                lc = LineCollection(segments, cmap='copper', norm=nc)
+                lc.set_array(g)
+                lc.set_linewidth(self.get_amount(c1, c2) * 10)
+                lc.set_zorder(0)
+                ax.add_collection(lc)
+                #ax.plot(x, y, '-k',
+                #        lw=self.get_amount(c1, c2) * 10,
+                #        zorder=0)
 
 
 @dataclass(order=True)
@@ -78,7 +98,7 @@ class FoodDistribution:
         self.cities = cities
         self.distances = [[dist(c1, c2) for c2 in self.cities]
                           for c1 in self.cities]
-        self.speed = 2
+        self.speed = 1
 
     def get_city(self, name: str) -> Optional[City]:
         for c in self.cities:
@@ -86,8 +106,12 @@ class FoodDistribution:
                 return c
         return None
 
-    def plot(self, ax: plt.Axes):
+    def plot(self, ax: plt.Axes, demand_override=None, excess_override=None):
         balances = np.array([c.balance for c in self.cities])
+        if demand_override is not None:
+            balances[demand_override < 0] = demand_override[demand_override < 0]
+        if excess_override is not None:
+            balances[excess_override > 0] = excess_override[excess_override > 0]
         sizes = np.zeros((len(self.cities),))
         colors = np.zeros((len(self.cities), 3))
         sizes[balances != 0] = 0.3 * balances[balances != 0] ** 2
@@ -104,6 +128,7 @@ class FoodDistribution:
         )
 
     def simulate(self, solution: Solution):
+        #print('sim')
         ratios = self.compute_ratios(solution)
         excesses = []
         demands = []
@@ -118,8 +143,11 @@ class FoodDistribution:
         total_cost = 0
         packages = []
         self.dispatch(packages, ratios, excesses)
+        i = 0
         while True:
-            arrived, cost = self.move(packages)
+            #print(i)
+            i += 1
+            arrived, cost = self.move(packages, excesses)
             total_cost += cost
             if arrived is None:
                 break
@@ -135,7 +163,8 @@ class FoodDistribution:
             if total_demand <= 0:
                 break
             self.dispatch(packages, ratios, excesses)
-        return total_demand, total_cost
+        return total_demand, total_cost, demands, [sum([e.amount for e in es])
+                                                   for es in excesses]
 
     def compute_ratios(self, solution):
         ratios = []
@@ -154,40 +183,52 @@ class FoodDistribution:
             ratios.append(r)
         return ratios
 
-    def dispatch(self, packages, ratios, balances):
+    def dispatch(self, packages, ratios, excesses):
         for i1, c1 in enumerate(self.cities):
-            if not balances[i1]:
+            if not excesses[i1]:
                 continue
-            while balances[i1]:
-                balance = heappop(balances[i1])
-                left = balance.amount
+            while excesses[i1]:
+                excess = heappop(excesses[i1])
+                amt = excess.amount
+                left = excess.amount
                 for i2, c2 in enumerate(self.cities):
                     r = ratios[i1][i2]
                     if r == 0:
                         continue
-                    amount = balance.amount * r
-                    if left - amount > 1e-6:
+                    amount = int(round(excess.amount * r))
+                    if amount <= 0:
+                        continue
+                    if amount < left:
                         left -= amount
                     else:
                         amount = left
                         left = 0
                     package = Package(amount, i1, i2,
                                       self.distances[i1][i2],
-                                      balance.expiration)
+                                      excess.expiration)
                     heappush(packages, package)
                 if left > 0:
-                    balance.amount = left
-                    heappush(balances[i1], balance)
+                    excess.amount = left
+                    heappush(excesses[i1], excess)
+                    if left == amt:
+                        break
 
-    def move(self, packages: List[Package]) -> Tuple[Optional[Package], float]:
+    def move(self, packages: List[Package],
+             balances: List[List[Balance]]) -> Tuple[Optional[Package], float]:
         if not packages:
             return None, 0
         cost = 0
         d = packages[0].distance
+        t = d / self.speed
         for p in packages:
             p.distance -= d
-            p.expiration -= d / self.speed
+            p.expiration -= t
             cost += d * p.amount
+        for bs in balances:
+            for b in bs:
+                b.expiration -= t
+            while bs and bs[0].expiration <= 0:
+                heappop(bs)
         head = heappop(packages)
         if head.expiration < 0:
             head = None

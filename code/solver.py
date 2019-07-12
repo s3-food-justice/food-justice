@@ -18,7 +18,7 @@ class SolverProblem(Problem):
         cost = np.zeros((x.shape[0],))
         for i in range(x.shape[0]):
             solution = Solution.from_vector(x[i, :], self.fd)
-            d, c = self.fd.simulate(solution)
+            d, c, _, _ = self.fd.simulate(solution)
             demand[i] = d
             cost[i] = c
         f['F'] = np.column_stack((demand, cost))
