@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from heapq import heappush, heappop
 from math import sqrt
 from typing import List, Dict, Tuple, Optional
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class City:
@@ -28,12 +30,32 @@ class Solution:
     def __init__(self, solution: Dict[Tuple[City, City], float]):
         self.solution = solution
 
+    @staticmethod
+    def from_vector(x, fd):
+        sol = dict()
+        for j, c1 in enumerate(fd.cities):
+            for k, c2 in enumerate(fd.cities):
+                if j == k:
+                    continue
+                idx = j * len(fd.cities) + k
+                sol[(fd.cities[j], fd.cities[k])] = x[idx]
+        return Solution(sol)
+
     def get_amount(self, city_a: City, city_b: City):
         if (city_a, city_b) in self.solution:
             key = city_a, city_b
         else:
             raise ValueError()
         return self.solution[key]
+
+    def plot(self, ax: plt.Axes, fd):
+        for c1 in fd.cities:
+            for c2 in fd.cities:
+                if c1 is c2:
+                    continue
+                ax.plot([c1.x, c2.x], [c1.y, c2.y], '-k',
+                        lw=self.get_amount(c1, c2) * 10,
+                        zorder=0)
 
 
 @dataclass(order=True)
@@ -63,6 +85,23 @@ class FoodDistribution:
             if c.name == name:
                 return c
         return None
+
+    def plot(self, ax: plt.Axes):
+        balances = np.array([c.balance for c in self.cities])
+        sizes = np.zeros((len(self.cities),))
+        colors = np.zeros((len(self.cities), 3))
+        sizes[balances != 0] = 0.3 * balances[balances != 0] ** 2
+        sizes[balances == 0] = 10 ** 2
+        colors[balances < 0, 0] = 1
+        colors[balances > 0, 1] = 1
+        colors[balances == 0, 2] = 1
+        ax.scatter(
+            x=[c.x for c in self.cities],
+            y=[c.y for c in self.cities],
+            s=sizes,
+            c=colors,
+            zorder=1
+        )
 
     def simulate(self, solution: Solution):
         print('sim...', end='')
