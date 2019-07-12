@@ -1,13 +1,26 @@
 import data
 from solver import solve
+import matplotlib
+matplotlib.use('PS')
 import matplotlib.pyplot as plt
+import numpy as np
 
 if __name__ == '__main__':
     #problem = data.load_problem('../data/simulated_data.txt')
-    problem = data.load_problem('../data/goeke-2018/c101C6.txt')
+    problem = data.load_problem('../data/ourdata.txt')
+    for c in problem.cities:
+        c.x, c.y = c.y, c.x
     #solution = data.load_solution('../data/simulated_solution.txt', problem)
-    x = solve(problem)
+    plt.figure(1)
+    plt.clf()
     ax = plt.axes()
-    data.Solution.from_vector(x[0, :], problem).plot(ax, problem)
     problem.plot(ax)
-    plt.show()
+    plt.savefig('../initial.eps', format='eps')
+    x = solve(problem)
+    #data.Solution.from_vector(x[0, :], problem).plot(ax, problem)
+    plt.figure(1)
+    plt.clf()
+    ax = plt.axes()
+    _, _, d, e = problem.simulate(data.Solution.from_vector(x[0, :], problem))
+    problem.plot(ax, -np.array(d), np.array(e))
+    plt.savefig('../final_best_demand.eps', format='eps')

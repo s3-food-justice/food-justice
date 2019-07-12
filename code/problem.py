@@ -98,7 +98,7 @@ class FoodDistribution:
         self.cities = cities
         self.distances = [[dist(c1, c2) for c2 in self.cities]
                           for c1 in self.cities]
-        self.speed = 1
+        self.speed = .3
 
     def get_city(self, name: str) -> Optional[City]:
         for c in self.cities:
@@ -112,9 +112,10 @@ class FoodDistribution:
             balances[demand_override < 0] = demand_override[demand_override < 0]
         if excess_override is not None:
             balances[excess_override > 0] = excess_override[excess_override > 0]
+        max = np.abs(balances).max()
         sizes = np.zeros((len(self.cities),))
         colors = np.zeros((len(self.cities), 3))
-        sizes[balances != 0] = 0.3 * balances[balances != 0] ** 2
+        sizes[balances != 0] = 80 * (balances[balances != 0] / max) ** 2
         sizes[balances == 0] = 10 ** 2
         colors[balances < 0, 0] = 1
         colors[balances > 0, 1] = 1
@@ -128,7 +129,7 @@ class FoodDistribution:
         )
 
     def simulate(self, solution: Solution):
-        #print('sim')
+        print('{} sim'.format(id(solution)))
         ratios = self.compute_ratios(solution)
         excesses = []
         demands = []
@@ -145,7 +146,7 @@ class FoodDistribution:
         self.dispatch(packages, ratios, excesses)
         i = 0
         while True:
-            #print(i)
+            #print('{} {}'.format(id(solution), i))
             i += 1
             arrived, cost = self.move(packages, excesses)
             total_cost += cost
