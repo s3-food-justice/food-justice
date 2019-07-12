@@ -104,7 +104,6 @@ class FoodDistribution:
         )
 
     def simulate(self, solution: Solution):
-        print('sim...', end='')
         ratios = self.compute_ratios(solution)
         excesses = []
         demands = []
@@ -136,7 +135,6 @@ class FoodDistribution:
             if total_demand <= 0:
                 break
             self.dispatch(packages, ratios, excesses)
-        print('end')
         return total_demand, total_cost
 
     def compute_ratios(self, solution):
